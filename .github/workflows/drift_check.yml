@@ -1,0 +1,65 @@
+name: Daily Drift Detection
+
+on:
+  schedule:
+    - cron: '0 9 * * *' # Runs every day at 9am UTC
+  workflow_dispatch:      # Allows you to click "Run Now" manually
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  analyze-drift:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install Dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run Drift Analysis
+        run: python detect_drift.py
+
+      - name: Upload Report to GitHub Pages Artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: 'site'
+
+      - name: Check for Drift & Alert Discord
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+        run: |
+          # Read the status from the JSON file python created
+          DRIFT_STATUS=$(python -c "import json; print(json.load(open('drift_status.json'))['drift'])")
+          
+          if [ "$DRIFT_STATUS" == "True" ]; then
+            echo "Drift Detected! Sending Alert..."
+            
+            # Send a rich message to Discord using curl
+            curl -H "Content-Type: application/json" \
+                 -X POST \
+                 -d '{"username": "DriftBot", "content": "🚨 **DATA DRIFT DETECTED!** \n\nThe production model is seeing data it was not trained for.\nView the health report here: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/"}' \
+                 $DISCORD_WEBHOOK
+          else
+            echo "No drift detected. System healthy."
+          fi
+
+  deploy-report:
+    needs: analyze-drift
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
