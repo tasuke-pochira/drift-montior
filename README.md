@@ -57,7 +57,7 @@ If you want to test the drift detection engine on your local machine:
 
 1.  **Clone the repository**
     ```bash
-    git clone [https://github.com/tasuke-pochira/drift-monitor.git](https://github.com/tasuke-pochira/drift-monitor.git)
+    git clone https://github.com/tasuke-pochira/drift-monitor.git
     cd drift-monitor
     ```
 
